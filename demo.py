@@ -5,13 +5,12 @@ import os
 import random
 import subprocess
 
-import cv2
 import hdf5storage as h5
 import matplotlib.pyplot as plt
 import numpy as np
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
-
+import cv2  # noqa: E402
 
 parser = argparse.ArgumentParser(description="Params")
 parser.add_argument(
@@ -147,7 +146,6 @@ if args.unwarp:
     # scale bm to -1.0 to 1.0
     bm_ = bm / np.array([448, 448])
     bm_ = (bm_ - 0.5) * 2
-    print(bm.shape)
     bm_ = np.reshape(bm_, (1, 448, 448, 2))
     bm_ = paddle.to_tensor(bm_, dtype=paddle.float32)
     img_ = alb.transpose((2, 0, 1)).astype(np.float32) / 255.0
