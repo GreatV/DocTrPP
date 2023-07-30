@@ -8,20 +8,9 @@ import paddle
 from paddle import nn
 from PIL import Image
 
-from GeoTr import GeoTr
+from GeoTr import GeoTrP
 
 warnings.filterwarnings("ignore")
-
-
-class GeoTrP(nn.Layer):
-    def __init__(self):
-        super(GeoTrP, self).__init__()
-        self.GeoTr = GeoTr()
-
-    def forward(self, x):
-        bm = self.GeoTr(x)
-        bm = (2 * (bm / 286.8) - 1) * 0.99
-        return bm
 
 
 def reload_model(model, path=""):

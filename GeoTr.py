@@ -371,3 +371,14 @@ class GeoTr(nn.Layer):
         flow_up = self.upsample_flow(coords1 - coords0, mask)
         bm_up = coodslar + flow_up
         return bm_up
+
+
+class GeoTrP(nn.Layer):
+    def __init__(self):
+        super(GeoTrP, self).__init__()
+        self.GeoTr = GeoTr()
+
+    def forward(self, x):
+        bm = self.GeoTr(x)
+        bm = (2 * (bm / 286.8) - 1) * 0.99
+        return bm

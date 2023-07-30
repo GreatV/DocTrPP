@@ -50,13 +50,13 @@ class PositionEmbeddingSine(nn.Layer):
 
     def forward(self, mask):
         assert mask is not None
-        y_embed = mask.cumsum(axis=1).astype("float32")
-        x_embed = mask.cumsum(axis=2).astype("float32")
+        y_embed = mask.cumsum(axis=1, dtype="float32")
+        x_embed = mask.cumsum(axis=2, dtype="float32")
         if self.normalize:
             eps = 1e-06
             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
             x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
-        dim_t = paddle.arange(end=self.num_pos_feats).astype("float32")
+        dim_t = paddle.arange(end=self.num_pos_feats, dtype="float32")
         dim_t = self.temperature ** (2 * (dim_t // 2) / self.num_pos_feats)
         pos_x = x_embed[:, :, :, None] / dim_t
         pos_y = y_embed[:, :, :, None] / dim_t

@@ -80,10 +80,8 @@ class BasicEncoder(nn.Layer):
 
         for _, m in self.named_children():
             if isinstance(m, nn.Conv2D):
-                param_init.kaiming_normal_init(
-                    m.weight, mode="fan_out", nonlinearity="relu"
-                )
-            elif isinstance(m, (nn.BatchNorm2D, nn.InstanceNorm2D, nn.GroupNorm)):
+                param_init.kaiming_normal_init(m.weight)
+            elif isinstance(m, (nn.BatchNorm2D, nn.GroupNorm)):
                 if m.weight is not None:
                     param_init.constant_init(m.weight, value=1)
                 if m.bias is not None:
