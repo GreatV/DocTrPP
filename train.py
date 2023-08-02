@@ -38,9 +38,9 @@ def train(args):
     print("The number of validation samples = %d" % val_data_size)
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=args.batch_size, num_workers=8, shuffle=True
+        train_dataset, batch_size=args.batch_size, num_workers=0, shuffle=True
     )
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=8)
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=0)
 
     model = GeoTrP()
     model = paddle.DataParallel(model)

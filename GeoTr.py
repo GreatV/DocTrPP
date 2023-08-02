@@ -54,14 +54,15 @@ class attnLayer(nn.Layer):
         memory_list,
         tgt_mask=None,
         memory_mask=None,
-        tgt_key_padding_mask=None,
-        memory_key_padding_mask=None,
         pos=None,
         memory_pos=None,
     ):
         q = k = self.with_pos_embed(tgt, pos)
         tgt2 = self.self_attn(
-            q, k, value=tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
+            q,
+            k,
+            value=tgt,
+            attn_mask=tgt_mask,
         )[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
@@ -77,7 +78,6 @@ class attnLayer(nn.Layer):
                 key=self.with_pos_embed(memory, m_pos),
                 value=memory,
                 attn_mask=memory_mask,
-                key_padding_mask=memory_key_padding_mask,
             )[0]
             tgt = tgt + dropout2(tgt2)
             tgt = norm2(tgt)
@@ -92,15 +92,16 @@ class attnLayer(nn.Layer):
         memory,
         tgt_mask=None,
         memory_mask=None,
-        tgt_key_padding_mask=None,
-        memory_key_padding_mask=None,
         pos=None,
         memory_pos=None,
     ):
         tgt2 = self.norm1(tgt)
         q = k = self.with_pos_embed(tgt2, pos)
         tgt2 = self.self_attn(
-            q, k, value=tgt2, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
+            q,
+            k,
+            value=tgt2,
+            attn_mask=tgt_mask,
         )[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt2 = self.norm2(tgt)
@@ -109,7 +110,6 @@ class attnLayer(nn.Layer):
             key=self.with_pos_embed(memory, memory_pos),
             value=memory,
             attn_mask=memory_mask,
-            key_padding_mask=memory_key_padding_mask,
         )[0]
         tgt = tgt + self.dropout2(tgt2)
         tgt2 = self.norm3(tgt)
@@ -123,8 +123,6 @@ class attnLayer(nn.Layer):
         memory_list,
         tgt_mask=None,
         memory_mask=None,
-        tgt_key_padding_mask=None,
-        memory_key_padding_mask=None,
         pos=None,
         memory_pos=None,
     ):
@@ -134,8 +132,6 @@ class attnLayer(nn.Layer):
                 memory_list,
                 tgt_mask,
                 memory_mask,
-                tgt_key_padding_mask,
-                memory_key_padding_mask,
                 pos,
                 memory_pos,
             )
@@ -144,8 +140,6 @@ class attnLayer(nn.Layer):
             memory_list,
             tgt_mask,
             memory_mask,
-            tgt_key_padding_mask,
-            memory_key_padding_mask,
             pos,
             memory_pos,
         )
