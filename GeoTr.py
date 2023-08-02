@@ -178,7 +178,7 @@ class TransDecoder(nn.Layer):
         pos = pos.flatten(start_axis=2).transpose(perm=[2, 0, 1])
         for layer in self.layers:
             query_embed = layer(query_embed, [imgf], pos=pos, memory_pos=[pos, pos])
-        query_embed = query_embed.transpose(perm=[1, 2, 0]).reshape(bs, c, h, w)
+        query_embed = query_embed.transpose(perm=[1, 2, 0]).reshape([bs, c, h, w])
         return query_embed
 
 
@@ -200,7 +200,7 @@ class TransEncoder(nn.Layer):
         pos = pos.flatten(start_axis=2).transpose(perm=[2, 0, 1])
         for layer in self.layers:
             imgf = layer(imgf, [imgf], pos=pos, memory_pos=[pos, pos])
-        imgf = imgf.transpose(perm=[1, 2, 0]).reshape(bs, c, h, w)
+        imgf = imgf.transpose(perm=[1, 2, 0]).reshape([bs, c, h, w])
         return imgf
 
 
@@ -320,9 +320,9 @@ class GeoTr(nn.Layer):
 
     def initialize_flow(self, img):
         N, C, H, W = img.shape
-        coodslar = coords_grid(N, H, W).to(img.place)
-        coords0 = coords_grid(N, H // 8, W // 8).to(img.place)
-        coords1 = coords_grid(N, H // 8, W // 8).to(img.place)
+        coodslar = coords_grid(N, H, W)
+        coords0 = coords_grid(N, H // 8, W // 8)
+        coords1 = coords_grid(N, H // 8, W // 8)
         return coodslar, coords0, coords1
 
     def upsample_flow(self, flow, mask):
@@ -333,7 +333,7 @@ class GeoTr(nn.Layer):
         up_flow = paddle.reshape(up_flow, (N, 2, 9, 1, 1, H, W))
         up_flow = paddle.sum(x=mask * up_flow, axis=2)
         up_flow = up_flow.transpose(perm=[0, 1, 4, 2, 5, 3])
-        return up_flow.reshape(N, 2, 8 * H, 8 * W)
+        return up_flow.reshape([N, 2, 8 * H, 8 * W])
 
     def forward(self, image1):
         fmap = self.fnet(image1)

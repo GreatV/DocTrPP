@@ -7,7 +7,6 @@ import paddle.optimizer as optim
 from paddle import nn
 from paddle.io import DataLoader
 from paddle.optimizer.lr import OneCycleLR
-from tqdm import tqdm
 
 from dataloader import Doc3dDataset
 from GeoTr import GeoTrP
@@ -75,7 +74,7 @@ def train(args):
         avgssimloss = 0.0
         train_mse = 0.0
         model.train()
-        for i, (images, labels) in tqdm(enumerate(train_dataloader)):
+        for i, (images, labels) in enumerate(train_dataloader):
             target = model(images[:, 3:, :, :])
             x = target
             perm_0 = list(range(x.ndim))
@@ -105,7 +104,7 @@ def train(args):
                 avg_loss = avg_loss / 50
                 print(
                     "Epoch[%d/%d] Batch [%d/%d] Loss: %.4f"
-                    % (epoch + 1, args.n_epoch, i + 1, len(train_dataloader), avg_loss)
+                    % (epoch + 1, args.epochs, i + 1, len(train_dataloader), avg_loss)
                 )
                 avg_loss = 0.0
         avgssimloss = avgssimloss / len(train_dataloader)
@@ -120,7 +119,7 @@ def train(args):
         val_mse = 0.0
         val_rloss = 0.0
         val_ssimloss = 0.0
-        for i_val, (images_val, labels_val) in tqdm(enumerate(val_dataloader)):
+        for i_val, (images_val, labels_val) in enumerate(val_dataloader):
             with paddle.no_grad():
                 target = model(images_val[:, 3:, :, :])
                 x = target
@@ -177,16 +176,16 @@ if __name__ == "__main__":
         "--data_path", nargs="?", type=str, default="", help="Data path to load data"
     )
     parser.add_argument(
-        "--img_rows", nargs="?", type=int, default=128, help="Height of the input image"
+        "--img_rows", nargs="?", type=int, default=288, help="Height of the input image"
     )
     parser.add_argument(
-        "--img_cols", nargs="?", type=int, default=128, help="Width of the input image"
+        "--img_cols", nargs="?", type=int, default=288, help="Width of the input image"
     )
     parser.add_argument(
-        "--epochs", nargs="?", type=int, default=100, help="# of the epochs"
+        "--epochs", nargs="?", type=int, default=56, help="# of the epochs"
     )
     parser.add_argument(
-        "--batch_size", nargs="?", type=int, default=1, help="Batch Size"
+        "--batch_size", nargs="?", type=int, default=24, help="Batch Size"
     )
     parser.add_argument(
         "--lr", nargs="?", type=float, default=1e-04, help="Learning Rate"
@@ -205,4 +204,5 @@ if __name__ == "__main__":
         "--project", type=str, default="runs", help="Name of the project"
     )
     args = parser.parse_args()
-    train(args)
+
+    dist.spawn(train, args=(args,))
