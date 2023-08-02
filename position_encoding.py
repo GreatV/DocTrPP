@@ -56,7 +56,7 @@ class PositionEmbeddingSine(nn.Layer):
             eps = 1e-06
             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
             x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
-        dim_t = paddle.arange(end=self.num_pos_feats, dtype="float32")
+        dim_t = paddle.arange(end=self.num_pos_feats)
         dim_t = self.temperature ** (2 * (dim_t // 2) / self.num_pos_feats)
         pos_x = x_embed[:, :, :, None] / dim_t
         pos_y = y_embed[:, :, :, None] / dim_t

@@ -4,7 +4,7 @@ import random
 
 import cv2
 import hdf5storage as h5
-import imageio
+import imageio.v2 as imageio
 import numpy as np
 import paddle
 from PIL import Image
