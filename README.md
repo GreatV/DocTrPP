@@ -5,15 +5,15 @@
 
 ## Train
 
-- WINDOWS
+- Windows
 
 ```powershell
 $env:OPENCV_IO_ENABLE_OPENEXR=1
 python .\train.py --data_path D:\datasets\doc3d\
 ```
 
-- Linux
+- Linux and MacOS
 
 ```bash
-OPENCV_IO_ENABLE_OPENEXR=1 python ./train.py --data_path ~/datasets/doc3d
+OPENCV_IO_ENABLE_OPENEXR="1" python ./train.py --data_path ~/datasets/doc3d
 ```

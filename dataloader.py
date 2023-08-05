@@ -114,6 +114,6 @@ class Doc3dDataset(paddle.io.Dataset):
         bm1 = cv2.resize(bm[:, :, 1], (self.img_size[0], self.img_size[1]))
         img = np.concatenate([alb, wc], axis=0)
         lbl = np.stack([bm0, bm1], axis=-1)
-        img = paddle.to_tensor(data=img).astype(dtype="float32")
-        lbl = paddle.to_tensor(data=lbl).astype(dtype="float32")
+        img = paddle.to_tensor(img, dtype="float32")
+        lbl = paddle.to_tensor(lbl, dtype="float32")
         return img, lbl

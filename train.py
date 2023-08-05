@@ -131,7 +131,7 @@ def train(args):
                 perm_3[2] = 3
                 perm_3[3] = 2
                 target_nhwc = x.transpose(perm=perm_3)
-                pred = target_nhwc.data.cpu()
+                pred = target_nhwc.cpu()
                 gt = labels_val.cpu()
                 l1loss = loss_fn(target_nhwc, labels_val)
                 rloss, ssim, uworg, uwpred = reconst_loss(
@@ -154,9 +154,7 @@ def train(args):
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
             }
-            base_name = (
-                f"{epoch + 1}_{val_mse}_{train_mse}_{experiment_name}_best_model.pkl"
-            )
+            base_name = "best_model.pkl"
             full_name = os.path.join(experiment_name, base_name)
             paddle.save(obj=state, path=full_name, protocol=4)
         if (epoch + 1) % 10 == 0:
@@ -165,7 +163,7 @@ def train(args):
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
             }
-            base_name = f"{epoch + 1}_{val_mse}_{train_mse}_{experiment_name}_model.pkl"
+            base_name = f"epoch_{epoch}_model.pkl"
             full_name = os.path.join(experiment_name, base_name)
             paddle.save(obj=state, path=full_name, protocol=4)
 
@@ -205,4 +203,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    dist.spawn(train, args=(args,))
+    train(args)
+
+    # dist.spawn(train, args=(args,))
