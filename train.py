@@ -74,8 +74,10 @@ def train(args):
         avgssimloss = 0.0
         train_mse = 0.0
         model.train()
+        # images [N, C, H, W] 24 x 6 x 288 x 288
+        # labels [N, H, W, C] 24 x 288 x 288 x 2
         for i, (images, labels) in enumerate(train_dataloader):
-            target = model(images[:, 3:, :, :])
+            target = model(images[:, :3, :, :])
             x = target
             perm_0 = list(range(x.ndim))
             perm_0[1] = 2
@@ -86,10 +88,8 @@ def train(args):
             perm_1[3] = 2
             target_nhwc = x.transpose(perm=perm_1)
             l1loss = loss_fn(target_nhwc, labels)
-            rloss, ssim, uworg, uwpred = reconst_loss(
-                images[:, :-1, :, :], target_nhwc, labels
-            )
-            loss = 10.0 * l1loss + 0.5 * rloss
+            rloss, ssim, _, _ = reconst_loss(images[:, :-1, :, :], target_nhwc, labels)
+            loss = l1loss
             avgl1loss += float(l1loss)
             avg_loss += float(loss)
             avgrloss += float(rloss)
@@ -119,7 +119,7 @@ def train(args):
         val_mse = 0.0
         val_rloss = 0.0
         val_ssimloss = 0.0
-        for i_val, (images_val, labels_val) in enumerate(val_dataloader):
+        for _, (images_val, labels_val) in enumerate(val_dataloader):
             with paddle.no_grad():
                 target = model(images_val[:, 3:, :, :])
                 x = target
@@ -134,7 +134,7 @@ def train(args):
                 pred = target_nhwc.cpu()
                 gt = labels_val.cpu()
                 l1loss = loss_fn(target_nhwc, labels_val)
-                rloss, ssim, uworg, uwpred = reconst_loss(
+                rloss, ssim, _, _ = reconst_loss(
                     images_val[:, :-1, :, :], target_nhwc, labels_val
                 )
                 val_l1loss += float(l1loss.cpu())

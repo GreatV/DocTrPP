@@ -10,6 +10,22 @@ import paddle
 from PIL import Image
 
 
+def color_jitter(im, p=0.1, brightness=0, contrast=0, saturation=0, hue=0):
+    chance = random.uniform(0, 1)
+    if chance < p:
+        f = random.uniform(1 - contrast, 1 + contrast)
+        im = np.clip(im * f, 0.0, 1.0)
+        f = random.uniform(-brightness, brightness)
+        im = np.clip(im + f, 0.0, 1.0).astype(np.float32)
+        hsv = cv2.cvtColor(im, cv2.COLOR_RGB2HSV)
+        f = random.uniform(-hue, hue) * 360.0
+        hsv[:, :, 0] = np.clip(hsv[:, :, 0] + f, 0.0, 360.0)
+        f = random.uniform(-saturation, saturation)
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] + f, 0.0, 1.0)
+        im = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+    return im
+
+
 class Doc3dDataset(paddle.io.Dataset):
     def __init__(self, root, split="train", is_transform=False, img_size=512):
         super().__init__()
@@ -45,6 +61,7 @@ class Doc3dDataset(paddle.io.Dataset):
         wc = cv2.imread(wc_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
         bm = h5.loadmat(bm_path)["bm"]
         alb = imageio.imread(alb_path, format="RGB")
+        alb = color_jitter(alb, 0.1, 0.2, 0.2, 0.6, 0.6)
         if self.is_transform:
             im, lbl = self.transform(wc, bm, alb)
         return im, lbl
@@ -78,7 +95,9 @@ class Doc3dDataset(paddle.io.Dataset):
 
     def transform(self, wc, bm, alb):
         wc, alb, t, b, left, right = self.tight_crop(wc, alb)
-        alb = np.array(Image.fromarray(alb).resize(self.img_size))
+        alb = np.array(
+            Image.fromarray((alb * 255).astype(np.uint8)).resize(self.img_size)
+        )
         alb = alb[:, :, ::-1]
         alb = alb.astype(np.float64)
         if alb.shape[2] == 4:
@@ -114,6 +133,8 @@ class Doc3dDataset(paddle.io.Dataset):
         bm1 = cv2.resize(bm[:, :, 1], (self.img_size[0], self.img_size[1]))
         img = np.concatenate([alb, wc], axis=0)
         lbl = np.stack([bm0, bm1], axis=-1)
+        # img = alb
+        # lbl = bm0
         img = paddle.to_tensor(img, dtype="float32")
         lbl = paddle.to_tensor(lbl, dtype="float32")
         return img, lbl
