@@ -338,11 +338,13 @@ class GeoTr(nn.Layer):
     def forward(self, image1):
         fmap = self.fnet(image1)
         fmap = F.relu(fmap)
+
         fmap1 = self.__getattr__(self.encoder_block[0])(fmap)
         fmap1d = self.__getattr__(self.down_layer[0])(fmap1)
         fmap2 = self.__getattr__(self.encoder_block[1])(fmap1d)
         fmap2d = self.__getattr__(self.down_layer[1])(fmap2)
         fmap3 = self.__getattr__(self.encoder_block[2])(fmap2d)
+
         query_embed0 = self.query_embed.weight.unsqueeze(axis=1).tile(
             repeat_times=[1, fmap3.shape[0], 1]
         )
