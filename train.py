@@ -9,8 +9,7 @@ from paddle.io import DataLoader
 from paddle.optimizer.lr import OneCycleLR
 
 from dataloader import Doc3dDataset
-from GeoTr import GeoTrP
-from loss import Unwarploss
+from GeoTr import GeoTr
 
 
 def train(args):
@@ -20,16 +19,12 @@ def train(args):
     experiment_name = os.path.join(args.project, args.name)
     os.makedirs(experiment_name, exist_ok=True)
 
-    dataset = Doc3dDataset
     data_path = args.data_path
-    train_dataset = dataset(
-        data_path, is_transform=True, img_size=(args.img_rows, args.img_cols)
-    )
+    train_dataset = Doc3dDataset(data_path, img_size=(args.img_rows, args.img_cols))
     train_data_size = len(train_dataset)
     print("The number of training samples = %d" % train_data_size)
-    val_dataset = dataset(
+    val_dataset = Doc3dDataset(
         data_path,
-        is_transform=True,
         split="val",
         img_size=(args.img_rows, args.img_cols),
     )
@@ -41,18 +36,16 @@ def train(args):
     )
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=0)
 
-    model = GeoTrP()
+    model = GeoTr()
     model = paddle.DataParallel(model)
 
-    toal_steps = int(train_data_size / args.batch_size * args.epochs)
+    toal_steps = len(train_dataloader) * args.epochs
     scheduler = OneCycleLR(
         max_learning_rate=args.lr, total_steps=toal_steps, phase_pct=0.1
     )
     optimizer = optim.AdamW(learning_rate=scheduler, parameters=model.parameters())
 
-    MSE = nn.MSELoss()
     loss_fn = nn.L1Loss()
-    reconst_loss = Unwarploss()
 
     epoch_start = 0
     if args.resume is not None:
@@ -65,19 +58,15 @@ def train(args):
         else:
             print(f"No checkpoint found at '{args.resume}'")
 
-    best_val_mse = 99999.0
+    best_val_l1loss = 99999.0
     global_step = 0
     for epoch in range(epoch_start, args.epochs):
         avg_loss = 0.0
-        avgl1loss = 0.0
-        avgrloss = 0.0
-        avgssimloss = 0.0
-        train_mse = 0.0
         model.train()
-        # images [N, C, H, W] 24 x 6 x 288 x 288
+        # images [N, C, H, W] 24 x 3 x 288 x 288
         # labels [N, H, W, C] 24 x 288 x 288 x 2
         for i, (images, labels) in enumerate(train_dataloader):
-            target = model(images[:, :3, :, :])
+            target = model(images)
             x = target
             perm_0 = list(range(x.ndim))
             perm_0[1] = 2
@@ -87,14 +76,8 @@ def train(args):
             perm_1[2] = 3
             perm_1[3] = 2
             target_nhwc = x.transpose(perm=perm_1)
-            l1loss = loss_fn(target_nhwc, labels)
-            rloss, ssim, _, _ = reconst_loss(images[:, :-1, :, :], target_nhwc, labels)
-            loss = l1loss
-            avgl1loss += float(l1loss)
-            avg_loss += float(loss)
-            avgrloss += float(rloss)
-            avgssimloss += float(ssim)
-            train_mse += MSE(target_nhwc, labels).item()
+            loss = loss_fn(target_nhwc, labels)
+            avg_loss += float(loss.cpu())
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
@@ -107,48 +90,29 @@ def train(args):
                     % (epoch + 1, args.epochs, i + 1, len(train_dataloader), avg_loss)
                 )
                 avg_loss = 0.0
-        avgssimloss = avgssimloss / len(train_dataloader)
-        avgrloss = avgrloss / len(train_dataloader)
-        avgl1loss = avgl1loss / len(train_dataloader)
-        train_mse = train_mse / len(train_dataloader)
-        print("Training L1:%4f" % avgl1loss)
-        print(f"Training MSE:'{train_mse}'")
-        optimizer.get_lr()
+        avg_l1_loss = avg_loss / len(train_dataloader)
+        lr = optimizer.get_lr()
+        print(f"Train loss at epoch {epoch + 1}: {avg_l1_loss:.4f}, lr: {lr:.6f}")
         model.eval()
         val_l1loss = 0.0
-        val_mse = 0.0
-        val_rloss = 0.0
-        val_ssimloss = 0.0
         for _, (images_val, labels_val) in enumerate(val_dataloader):
             with paddle.no_grad():
-                target = model(images_val[:, 3:, :, :])
+                target = model(images_val)
                 x = target
-                perm_2 = list(range(x.ndim))
-                perm_2[1] = 2
-                perm_2[2] = 1
-                x = x.transpose(perm=perm_2)
-                perm_3 = list(range(x.ndim))
-                perm_3[2] = 3
-                perm_3[3] = 2
-                target_nhwc = x.transpose(perm=perm_3)
-                pred = target_nhwc.cpu()
-                gt = labels_val.cpu()
+                perm_0 = list(range(x.ndim))
+                perm_0[1] = 2
+                perm_0[2] = 1
+                x = x.transpose(perm=perm_0)
+                perm_1 = list(range(x.ndim))
+                perm_1[2] = 3
+                perm_1[3] = 2
+                target_nhwc = x.transpose(perm=perm_1)
                 l1loss = loss_fn(target_nhwc, labels_val)
-                rloss, ssim, _, _ = reconst_loss(
-                    images_val[:, :-1, :, :], target_nhwc, labels_val
-                )
                 val_l1loss += float(l1loss.cpu())
-                val_rloss += float(rloss.cpu())
-                val_ssimloss += float(ssim.cpu())
-                val_mse += float(MSE(pred, gt))
         val_l1loss = val_l1loss / len(val_dataloader)
-        val_mse = val_mse / len(val_dataloader)
-        val_ssimloss = val_ssimloss / len(val_dataloader)
-        val_rloss = val_rloss / len(val_dataloader)
-        print(f"val loss at epoch {epoch + 1}:: {val_l1loss}")
-        print(f"val mse: {val_mse}")
-        if val_mse < best_val_mse:
-            best_val_mse = val_mse
+        print(f"Val loss at epoch {epoch + 1}: {val_l1loss:.4f}")
+        if val_l1loss < best_val_l1loss:
+            best_val_l1loss = val_l1loss
             state = {
                 "epoch": epoch + 1,
                 "model_state": model.state_dict(),

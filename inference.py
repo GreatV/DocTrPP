@@ -5,10 +5,10 @@ import warnings
 import cv2
 import numpy as np
 import paddle
-from paddle import nn
+from paddle.nn import functional as F
 from PIL import Image
 
-from GeoTr import GeoTrP
+from GeoTr import GeoTr
 
 warnings.filterwarnings("ignore")
 
@@ -17,15 +17,8 @@ def reload_model(model, path=""):
     if not bool(path):
         return model
     else:
-        model_dict = model.state_dict()
         pretrained_dict = paddle.load(path)
-        print(len(pretrained_dict.keys()))
-        pretrained_dict = {
-            k[7:]: v for k, v in pretrained_dict.items() if k[7:] in model_dict
-        }
-        print(len(pretrained_dict.keys()))
-        model_dict.update(pretrained_dict)
-        model.set_state_dict(model_dict)
+        model.set_state_dict(pretrained_dict["model_state"])
         return model
 
 
@@ -33,8 +26,8 @@ def rec(opt):
     img_list = os.listdir(opt.distorrted_path)
     if not os.path.exists(opt.gsave_path):
         os.mkdir(opt.gsave_path)
-    model = GeoTrP()
-    reload_model(model.GeoTr, opt.GeoTr_path)
+    model = GeoTr()
+    reload_model(model, opt.GeoTr_path)
     model.eval()
     for img_path in img_list:
         name = img_path.split(".")[-2]
@@ -46,27 +39,38 @@ def rec(opt):
         im = paddle.to_tensor(im).astype(dtype="float32").unsqueeze(axis=0)
         with paddle.no_grad():
             bm = model(im)
+            print(bm.shape)
+            x = bm
+            perm_0 = list(range(x.ndim))
+            perm_0[1] = 2
+            perm_0[2] = 1
+            x = x.transpose(perm=perm_0)
+            perm_1 = list(range(x.ndim))
+            perm_1[2] = 3
+            perm_1[3] = 2
+            bm = x.transpose(perm=perm_1)
             bm = bm.cpu()
             bm0 = cv2.resize(bm[0, 0].numpy(), (w, h))
             bm1 = cv2.resize(bm[0, 1].numpy(), (w, h))
-            bm0 = cv2.blur(bm0, (3, 3))
-            bm1 = cv2.blur(bm1, (3, 3))
-            lbl = paddle.to_tensor(np.stack([bm0, bm1], axis=2)).unsqueeze(axis=0)
-            out = nn.functional.grid_sample(
-                paddle.to_tensor(im_ori)
-                .transpose(perm=[2, 0, 1])
-                .unsqueeze(axis=0)
-                .astype(dtype="float32"),
-                grid=lbl,
-                align_corners=True,
+            bm = np.stack([bm0, bm1], axis=-1)
+            print(bm.shape)
+            bm_ = np.reshape(bm, (1, 448, 448, 2))
+            bm_ = paddle.to_tensor(bm_, dtype=paddle.float32)
+            img_ = im_ori.transpose((2, 0, 1)).astype(np.float32) / 255.0
+            img_ = np.expand_dims(img_, 0)
+            img_ = paddle.to_tensor(img_)
+            uw = F.grid_sample(img_, bm_)
+            uw = uw[0].numpy().transpose((1, 2, 0))
+            gt_uw = cv2.cvtColor(uw, cv2.COLOR_RGB2BGR)
+            gt_uw = cv2.normalize(
+                gt_uw,
+                dst=None,
+                alpha=0,
+                beta=255,
+                norm_type=cv2.NORM_MINMAX,
+                dtype=cv2.CV_8U,
             )
-            img_geo = (
-                (out[0] * 255)
-                .transpose(perm=[1, 2, 0])
-                .numpy()[:, :, ::-1]
-                .astype(np.uint8)
-            )
-            cv2.imwrite(opt.gsave_path + name + "_geo" + ".png", img_geo)
+            cv2.imwrite(opt.gsave_path + name + "_geo" + ".png", gt_uw)
         print("Done: ", img_path)
 
 

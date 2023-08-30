@@ -1,37 +1,28 @@
 import collections
 import os
-import random
 
 import cv2
 import hdf5storage as h5
-import imageio.v2 as imageio
 import numpy as np
 import paddle
-from PIL import Image
+from paddle.io import Dataset
+from paddle.vision import transforms
 
 
-def color_jitter(im, p=0.1, brightness=0, contrast=0, saturation=0, hue=0):
-    chance = random.uniform(0, 1)
-    if chance < p:
-        f = random.uniform(1 - contrast, 1 + contrast)
-        im = np.clip(im * f, 0.0, 1.0)
-        f = random.uniform(-brightness, brightness)
-        im = np.clip(im + f, 0.0, 1.0).astype(np.float32)
-        hsv = cv2.cvtColor(im, cv2.COLOR_RGB2HSV)
-        f = random.uniform(-hue, hue) * 360.0
-        hsv[:, :, 0] = np.clip(hsv[:, :, 0] + f, 0.0, 360.0)
-        f = random.uniform(-saturation, saturation)
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1] + f, 0.0, 1.0)
-        im = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-    return im
-
-
-class Doc3dDataset(paddle.io.Dataset):
-    def __init__(self, root, split="train", is_transform=False, img_size=512):
+class Doc3dDataset(Dataset):
+    def __init__(self, root, split="train", img_size=512):
         super().__init__()
         self.root = os.path.expanduser(root)
         self.split = split
-        self.is_transform = is_transform
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(img_size),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
         self.files = collections.defaultdict(list)
         self.img_size = (
             img_size if isinstance(img_size, tuple) else (img_size, img_size)
@@ -47,94 +38,19 @@ class Doc3dDataset(paddle.io.Dataset):
 
     def __getitem__(self, index):
         im_name = self.files[self.split][index]
-        # os.path.join(self.root, "img", "{0}.png".format(im_name))
-        img_foldr, file_name = os.path.split(im_name)
-        recon_foldr = "chess48"
-        wc_path = os.path.join(self.root, "wc", "{0}.exr".format(im_name))
-        bm_path = os.path.join(self.root, "bm", "{0}.mat".format(im_name))
-        alb_path = os.path.join(
-            self.root,
-            "recon",
-            img_foldr,
-            file_name[:-4] + recon_foldr + "0001.png",
-        )
-        wc = cv2.imread(wc_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+        im_path = os.path.join(self.root, "img", f"{im_name}.png")
+        bm_path = os.path.join(self.root, "bm", f"{im_name}.mat")
+        im = cv2.imread(im_path)
+        im = self.transform(im)
+        # im = im.transpose((2, 0, 1))
+
         bm = h5.loadmat(bm_path)["bm"]
-        alb = imageio.imread(alb_path, format="RGB")
-        alb = color_jitter(alb, 0.1, 0.2, 0.2, 0.6, 0.6)
-        if self.is_transform:
-            im, lbl = self.transform(wc, bm, alb)
-        return im, lbl
-
-    def tight_crop(self, wc, alb):
-        msk = ((wc[:, :, 0] != 0) & (wc[:, :, 1] != 0) & (wc[:, :, 2] != 0)).astype(
-            np.uint8
-        )
-        size = msk.shape
-        [y, x] = msk.nonzero()
-        minx = min(x)
-        maxx = max(x)
-        miny = min(y)
-        maxy = max(y)
-        wc = wc[miny : maxy + 1, minx : maxx + 1, :]
-        alb = alb[miny : maxy + 1, minx : maxx + 1, :]
-        s = 20
-        wc = np.pad(wc, ((s, s), (s, s), (0, 0)), "constant")
-        alb = np.pad(alb, ((s, s), (s, s), (0, 0)), "constant")
-        cx1 = random.randint(0, s - 5)
-        cx2 = random.randint(0, s - 5) + 1
-        cy1 = random.randint(0, s - 5)
-        cy2 = random.randint(0, s - 5) + 1
-        wc = wc[cy1:-cy2, cx1:-cx2, :]
-        alb = alb[cy1:-cy2, cx1:-cx2, :]
-        t = miny - s + cy1
-        b = size[0] - maxy - s + cy2
-        left = minx - s + cx1
-        right = size[1] - maxx - s + cx2
-        return wc, alb, t, b, left, right
-
-    def transform(self, wc, bm, alb):
-        wc, alb, t, b, left, right = self.tight_crop(wc, alb)
-        alb = np.array(
-            Image.fromarray((alb * 255).astype(np.uint8)).resize(self.img_size)
-        )
-        alb = alb[:, :, ::-1]
-        alb = alb.astype(np.float64)
-        if alb.shape[2] == 4:
-            alb = alb[:, :, :3]
-        alb = alb.astype(float) / 255.0
-        alb = alb.transpose(2, 0, 1)
-        msk = ((wc[:, :, 0] != 0) & (wc[:, :, 1] != 0) & (wc[:, :, 2] != 0)).astype(
-            np.uint8
-        ) * 255
-        xmx, xmn, ymx, ymn, zmx, zmn = (
-            1.2539363,
-            -1.2442188,
-            1.2396319,
-            -1.2289206,
-            0.6436657,
-            -0.67492497,
-        )
-        wc[:, :, 0] = (wc[:, :, 0] - zmn) / (zmx - zmn)
-        wc[:, :, 1] = (wc[:, :, 1] - ymn) / (ymx - ymn)
-        wc[:, :, 2] = (wc[:, :, 2] - xmn) / (xmx - xmn)
-        wc = cv2.bitwise_and(wc, wc, mask=msk)
-        wc = np.array(
-            Image.fromarray((wc * 255).astype(np.uint8)).resize(self.img_size)
-        )
-        wc = wc.astype(float) / 255.0
-        wc = wc.transpose(2, 0, 1)
-        bm = bm.astype(float)
-        bm[:, :, 1] = bm[:, :, 1] - t
-        bm[:, :, 0] = bm[:, :, 0] - left
-        bm = bm / np.array([448.0 - left - right, 448.0 - t - b])
+        bm = bm / np.array([448, 448])
         bm = (bm - 0.5) * 2
         bm0 = cv2.resize(bm[:, :, 0], (self.img_size[0], self.img_size[1]))
         bm1 = cv2.resize(bm[:, :, 1], (self.img_size[0], self.img_size[1]))
-        img = np.concatenate([alb, wc], axis=0)
-        lbl = np.stack([bm0, bm1], axis=-1)
-        # img = alb
-        # lbl = bm0
-        img = paddle.to_tensor(img, dtype="float32")
-        lbl = paddle.to_tensor(lbl, dtype="float32")
-        return img, lbl
+        bm = np.stack([bm0, bm1], axis=-1)
+
+        bm = paddle.to_tensor(bm, dtype="float32")
+
+        return im, bm
