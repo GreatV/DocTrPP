@@ -243,13 +243,19 @@ def upflow8(flow, mode="bilinear"):
     return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
 
+def to_2tuple(x):
+    if isinstance(x, tuple):
+        return x
+    return (x, x)
+
+
 class OverlapPatchEmbed(nn.Layer):
     """Image to Patch Embedding"""
 
     def __init__(self, img_size=224, patch_size=7, stride=4, in_chans=3, embed_dim=768):
         super().__init__()
-        img_size = self.to_2tuple(img_size)
-        patch_size = self.to_2tuple(patch_size)
+        img_size = to_2tuple(img_size)
+        patch_size = to_2tuple(patch_size)
         self.img_size = img_size
         self.patch_size = patch_size
         self.H, self.W = img_size[0] // patch_size[0], img_size[1] // patch_size[1]
@@ -264,11 +270,6 @@ class OverlapPatchEmbed(nn.Layer):
         self.norm = nn.LayerNorm(embed_dim)
         self.apply(self._init_weights)
 
-    def to_2tuple(x):
-        if isinstance(x, tuple):
-            return x
-        return (x, x)
-
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             param_init.trunc_normal_init(m.bias, std=0.02)
@@ -278,11 +279,11 @@ class OverlapPatchEmbed(nn.Layer):
             param_init.constant_init(m.bias, value=0.0)
             param_init.constant_init(m.weight, value=1.0)
         elif isinstance(m, nn.Conv2D):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+            fan_out = m._kernel_size[0] * m._kernel_size[1] * m._out_channels
+            fan_out //= m._groups
+            param_init.normal_init(m.weight, mean=0.0, std=math.sqrt(2.0 / fan_out))
             if m.bias is not None:
-                m.bias.data.zero_()
+                param_init.constant_init(m.bias, value=0.0)
 
     def forward(self, x):
         x = self.proj(x)
@@ -299,9 +300,7 @@ class OverlapPatchEmbed(nn.Layer):
 class GeoTr(nn.Layer):
     def __init__(self):
         super(GeoTr, self).__init__()
-
         self.hidden_dim = hdim = 256
-
         self.fnet = BasicEncoder(output_dim=hdim, norm_fn="instance")
         self.encoder_block = [("encoder_block" + str(i)) for i in range(3)]
         for i in self.encoder_block:
@@ -331,7 +330,7 @@ class GeoTr(nn.Layer):
         N, _, H, W = flow.shape
         mask = paddle.reshape(mask, (N, 1, 9, 8, 8, H, W))
         mask = F.softmax(mask, axis=2)
-        up_flow = F.unfold(x=8 * flow, kernel_sizes=list([3, 3]), paddings=1)
+        up_flow = F.unfold(8 * flow, kernel_sizes=[3, 3], paddings=1)
         up_flow = paddle.reshape(up_flow, (N, 2, 9, 1, 1, H, W))
         up_flow = paddle.sum(x=mask * up_flow, axis=2)
         up_flow = up_flow.transpose(perm=[0, 1, 4, 2, 5, 3])
@@ -353,12 +352,14 @@ class GeoTr(nn.Layer):
         query_embed0 = self.query_embed.weight.unsqueeze(axis=1).tile(
             repeat_times=[1, fmap3.shape[0], 1]
         )
+
         fmap3d_ = self.__getattr__(self.decoder_block[0])(fmap3, query_embed0)
         fmap3du_ = (
             self.__getattr__(self.up_layer[0])(fmap3d_)
             .flatten(start_axis=2)
             .transpose(perm=[2, 0, 1])
         )
+
         fmap2d_ = self.__getattr__(self.decoder_block[1])(fmap2, fmap3du_)
         fmap2du_ = (
             self.__getattr__(self.up_layer[1])(fmap2d_)
@@ -386,9 +387,3 @@ class GeoTrP(nn.Layer):
         bm = self.GeoTr(x)
         bm = (2 * (bm / 286.8) - 1) * 0.99
         return bm
-
-
-if __name__ == "__main__":
-    model = GeoTr()
-    img = paddle.randn([1, 3, 288, 288], dtype="float32")
-    paddle.summary(model, input=img)
