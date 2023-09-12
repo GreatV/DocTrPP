@@ -100,14 +100,14 @@ class BasicEncoder(nn.Layer):
                 param_init.kaiming_normal_init(m.weight)
             elif isinstance(m, (nn.BatchNorm2D, nn.GroupNorm)):
                 if m.weight is not None:
-                    param_init.constant_init(m.weight, value=1)
+                    param_init.constant_init(m.weight, value=1.0)
                 if m.bias is not None:
-                    param_init.constant_init(m.bias, value=0)
+                    param_init.constant_init(m.bias, value=0.0)
             elif isinstance(m, nn.InstanceNorm2D):
                 if m.scale is not None:
-                    param_init.constant_init(m.scale, value=1)
+                    param_init.constant_init(m.scale, value=1.0)
                 if m.bias is not None:
-                    param_init.constant_init(m.bias, value=0)
+                    param_init.constant_init(m.bias, value=0.0)
 
     def _make_layer(self, dim, stride=1):
         layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)

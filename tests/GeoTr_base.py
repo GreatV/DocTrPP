@@ -179,12 +179,10 @@ class TransDecoderBase(nn.Module):
         pos = self.position_embedding(
             torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool()
         )  # torch.Size([1, 128, 36, 36])
-
         bs, c, h, w = imgf.shape
         imgf = imgf.flatten(2).permute(2, 0, 1)
         # query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         pos = pos.flatten(2).permute(2, 0, 1)
-
         for layer in self.layers:
             query_embed = layer(query_embed, [imgf], pos=pos, memory_pos=[pos, pos])
         query_embed = query_embed.permute(1, 2, 0).reshape(bs, c, h, w)
@@ -330,7 +328,7 @@ class GeoTrBase(nn.Module):
 
         self.hidden_dim = hdim = 256
 
-        self.fnet = BasicEncoderBase(output_dim=hdim, norm_fn="group")
+        self.fnet = BasicEncoderBase(output_dim=hdim, norm_fn="batch")
 
         self.encoder_block = ["encoder_block" + str(i) for i in range(3)]
         for i in self.encoder_block:
@@ -364,14 +362,15 @@ class GeoTrBase(nn.Module):
         N, _, H, W = flow.shape
         mask = mask.view(N, 1, 9, 8, 8, H, W)
         mask = torch.softmax(mask, dim=2)
+        return flow
+        # up_flow = F.unfold(8 * flow, [3, 3], padding=1)
+        # return up_flow
+        # up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
 
-        up_flow = F.unfold(8 * flow, [3, 3], padding=1)
-        up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
+        # up_flow = torch.sum(mask * up_flow, dim=2)
+        # up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
 
-        up_flow = torch.sum(mask * up_flow, dim=2)
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
-
-        return up_flow.reshape(N, 2, 8 * H, 8 * W)
+        # return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
     def forward(self, image1):
         fmap = self.fnet(image1)
@@ -380,16 +379,21 @@ class GeoTrBase(nn.Module):
         # fmap = self.TransEncoderBase(fmap)
         fmap1 = self.__getattr__(self.encoder_block[0])(fmap)
         fmap1d = self.__getattr__(self.down_layer[0])(fmap1)
+
         fmap2 = self.__getattr__(self.encoder_block[1])(fmap1d)
         fmap2d = self.__getattr__(self.down_layer[1])(fmap2)
         fmap3 = self.__getattr__(self.encoder_block[2])(fmap2d)
 
         query_embed0 = self.query_embed.weight.unsqueeze(1).repeat(1, fmap3.size(0), 1)
+
         fmap3d_ = self.__getattr__(self.decoder_block[0])(fmap3, query_embed0)
+
         fmap3du_ = (
             self.__getattr__(self.up_layer[0])(fmap3d_).flatten(2).permute(2, 0, 1)
         )
+
         fmap2d_ = self.__getattr__(self.decoder_block[1])(fmap2, fmap3du_)
+
         fmap2du_ = (
             self.__getattr__(self.up_layer[1])(fmap2d_).flatten(2).permute(2, 0, 1)
         )
@@ -399,7 +403,9 @@ class GeoTrBase(nn.Module):
         coodslar, coords0, coords1 = self.initialize_flow(image1)
         coords1 = coords1.detach()
         mask, coords1 = self.update_block(fmap_out, coords1)
-        flow_up = self.upsample_flow(coords1 - coords0, mask)
-        bm_up = coodslar + flow_up
+        return coords1
+        # flow_up = self.upsample_flow(coords1 - coords0, mask)
+        # return flow_up
+        # bm_up = coodslar + flow_up
 
-        return bm_up
+        # return bm_up

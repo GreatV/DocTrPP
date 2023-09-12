@@ -67,15 +67,7 @@ def train(args):
         # labels [N, H, W, C] 24 x 288 x 288 x 2
         for i, (images, labels) in enumerate(train_dataloader):
             target = model(images)
-            x = target
-            perm_0 = list(range(x.ndim))
-            perm_0[1] = 2
-            perm_0[2] = 1
-            x = x.transpose(perm=perm_0)
-            perm_1 = list(range(x.ndim))
-            perm_1[2] = 3
-            perm_1[3] = 2
-            target_nhwc = x.transpose(perm=perm_1)
+            target_nhwc = target.transpose(perm=[0, 2, 3, 1])
             loss = loss_fn(target_nhwc, labels)
             avg_loss += float(loss.cpu())
             loss.backward()
@@ -98,15 +90,7 @@ def train(args):
         for _, (images_val, labels_val) in enumerate(val_dataloader):
             with paddle.no_grad():
                 target = model(images_val)
-                x = target
-                perm_0 = list(range(x.ndim))
-                perm_0[1] = 2
-                perm_0[2] = 1
-                x = x.transpose(perm=perm_0)
-                perm_1 = list(range(x.ndim))
-                perm_1[2] = 3
-                perm_1[3] = 2
-                target_nhwc = x.transpose(perm=perm_1)
+                target_nhwc = target.transpose(perm=[0, 2, 3, 1])
                 l1loss = loss_fn(target_nhwc, labels_val)
                 val_l1loss += float(l1loss.cpu())
         val_l1loss = val_l1loss / len(val_dataloader)

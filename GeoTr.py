@@ -299,7 +299,9 @@ class OverlapPatchEmbed(nn.Layer):
 class GeoTr(nn.Layer):
     def __init__(self):
         super(GeoTr, self).__init__()
+
         self.hidden_dim = hdim = 256
+
         self.fnet = BasicEncoder(output_dim=hdim, norm_fn="instance")
         self.encoder_block = [("encoder_block" + str(i)) for i in range(3)]
         for i in self.encoder_block:
@@ -335,14 +337,17 @@ class GeoTr(nn.Layer):
         up_flow = up_flow.transpose(perm=[0, 1, 4, 2, 5, 3])
         return up_flow.reshape([N, 2, 8 * H, 8 * W])
 
-    def forward(self, image1):
-        fmap = self.fnet(image1)
+    # [N, C, H, W]
+    def forward(self, x):
+        fmap = self.fnet(x)
         fmap = F.relu(fmap)
 
         fmap1 = self.__getattr__(self.encoder_block[0])(fmap)
         fmap1d = self.__getattr__(self.down_layer[0])(fmap1)
+
         fmap2 = self.__getattr__(self.encoder_block[1])(fmap1d)
         fmap2d = self.__getattr__(self.down_layer[1])(fmap2)
+
         fmap3 = self.__getattr__(self.encoder_block[2])(fmap2d)
 
         query_embed0 = self.query_embed.weight.unsqueeze(axis=1).tile(
@@ -361,11 +366,14 @@ class GeoTr(nn.Layer):
             .transpose(perm=[2, 0, 1])
         )
         fmap_out = self.__getattr__(self.decoder_block[2])(fmap1, fmap2du_)
-        coodslar, coords0, coords1 = self.initialize_flow(image1)
+
+        coodslar, coords0, coords1 = self.initialize_flow(x)
         coords1 = coords1.detach()
         mask, coords1 = self.update_block(fmap_out, coords1)
         flow_up = self.upsample_flow(coords1 - coords0, mask)
         bm_up = coodslar + flow_up
+
+        # [N, C, H, W]
         return bm_up
 
 
@@ -378,3 +386,9 @@ class GeoTrP(nn.Layer):
         bm = self.GeoTr(x)
         bm = (2 * (bm / 286.8) - 1) * 0.99
         return bm
+
+
+if __name__ == "__main__":
+    model = GeoTr()
+    img = paddle.randn([1, 3, 288, 288], dtype="float32")
+    paddle.summary(model, input=img)
