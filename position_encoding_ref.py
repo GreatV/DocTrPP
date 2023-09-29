@@ -9,13 +9,13 @@ import torch
 from torch import Tensor, nn
 
 
-class NestedTensorBase(object):
+class NestedTensorRef(object):
     def __init__(self, tensors, mask: Optional[Tensor]):
         self.tensors = tensors
         self.mask = mask
 
     def to(self, device):
-        # type: (Device) -> NestedTensorBase # noqa
+        # type: (device) -> NestedTensorRef # noqa
         cast_tensor = self.tensors.to(device)
         mask = self.mask
         if mask is not None:
@@ -23,7 +23,7 @@ class NestedTensorBase(object):
             cast_mask = mask.to(device)
         else:
             cast_mask = None
-        return NestedTensorBase(cast_tensor, cast_mask)
+        return NestedTensorRef(cast_tensor, cast_mask)
 
     def decompose(self):
         return self.tensors, self.mask
@@ -32,7 +32,7 @@ class NestedTensorBase(object):
         return str(self.tensors)
 
 
-class PositionEmbeddingSineBase(nn.Module):
+class PositionEmbeddingSineRef(nn.Module):
     """
     This is a more standard version of the position embedding, very similar to the one
     used by the Attention is all you need paper, generalized to work on images.
@@ -76,7 +76,7 @@ class PositionEmbeddingSineBase(nn.Module):
         return pos
 
 
-class PositionEmbeddingLearnedBase(nn.Module):
+class PositionEmbeddingLearnedRef(nn.Module):
     """
     Absolute pos embedding, learned.
     """
@@ -91,7 +91,7 @@ class PositionEmbeddingLearnedBase(nn.Module):
         nn.init.uniform_(self.row_embed.weight)
         nn.init.uniform_(self.col_embed.weight)
 
-    def forward(self, tensor_list: NestedTensorBase):
+    def forward(self, tensor_list: NestedTensorRef):
         x = tensor_list.tensors
         h, w = x.shape[-2:]
         i = torch.arange(w, device=x.device)
@@ -113,12 +113,12 @@ class PositionEmbeddingLearnedBase(nn.Module):
         return pos
 
 
-def build_position_encoding_base(hidden_dim=512, position_embedding="sine"):
+def build_position_encoding_ref(hidden_dim=512, position_embedding="sine"):
     N_steps = hidden_dim // 2
     if position_embedding in ("v2", "sine"):
-        position_embedding = PositionEmbeddingSineBase(N_steps, normalize=True)
+        position_embedding = PositionEmbeddingSineRef(N_steps, normalize=True)
     elif position_embedding in ("v3", "learned"):
-        position_embedding = PositionEmbeddingLearnedBase(N_steps)
+        position_embedding = PositionEmbeddingLearnedRef(N_steps)
     else:
         raise ValueError(f"not supported {position_embedding}")
 

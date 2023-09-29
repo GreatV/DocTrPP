@@ -1,9 +1,9 @@
 import torch.nn as nn
 
 
-class ResidualBlockBase(nn.Module):
+class ResidualBlockRef(nn.Module):
     def __init__(self, in_planes, planes, norm_fn="group", stride=1):
-        super(ResidualBlockBase, self).__init__()
+        super(ResidualBlockRef, self).__init__()
 
         self.conv1 = nn.Conv2d(
             in_planes, planes, kernel_size=3, padding=1, stride=stride
@@ -56,9 +56,9 @@ class ResidualBlockBase(nn.Module):
         return self.relu(x + y)
 
 
-class BasicEncoderBase(nn.Module):
+class BasicEncoderRef(nn.Module):
     def __init__(self, output_dim=128, norm_fn="batch"):
-        super(BasicEncoderBase, self).__init__()
+        super(BasicEncoderRef, self).__init__()
         self.norm_fn = norm_fn
 
         if self.norm_fn == "group":
@@ -87,6 +87,7 @@ class BasicEncoderBase(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                nn.init.constant_(m.bias, 0)
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
@@ -94,8 +95,8 @@ class BasicEncoderBase(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlockBase(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = ResidualBlockBase(dim, dim, self.norm_fn, stride=1)
+        layer1 = ResidualBlockRef(self.in_planes, dim, self.norm_fn, stride=stride)
+        layer2 = ResidualBlockRef(dim, dim, self.norm_fn, stride=1)
         layers = (layer1, layer2)
 
         self.in_planes = dim
