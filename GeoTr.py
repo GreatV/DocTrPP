@@ -265,11 +265,8 @@ class OverlapPatchEmbed(nn.Layer):
 
         img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         patch_size = (
-            patch_size if isinstance(img_size, tuple) else (patch_size, patch_size)
+            patch_size if isinstance(patch_size, tuple) else (patch_size, patch_size)
         )
-
-        self.img_size = img_size
-        self.patch_size = patch_size
 
         self.H, self.W = img_size[0] // patch_size[0], img_size[1] // patch_size[1]
         self.num_patches = self.H * self.W
@@ -291,7 +288,9 @@ class OverlapPatchEmbed(nn.Layer):
         elif isinstance(m, nn.LayerNorm):
             weight_init_(m, "Constant", value=1.0)
         elif isinstance(m, nn.Conv2D):
-            weight_init_(m, "kaiming_normal_", mode="fan_out", nonlinearity="relu")
+            weight_init_(
+                m.weight, "kaiming_normal_", mode="fan_out", nonlinearity="relu"
+            )
 
     def forward(self, x):
         x = self.proj(x)
@@ -308,7 +307,7 @@ class OverlapPatchEmbed(nn.Layer):
         return x, H, W
 
 
-class GeoTr(paddle.nn.Layer):
+class GeoTr(nn.Layer):
     def __init__(self):
         super(GeoTr, self).__init__()
 
