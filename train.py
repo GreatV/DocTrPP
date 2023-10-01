@@ -114,21 +114,6 @@ def train(args):
     # Config
     init_seeds(args.seed)
 
-    # Model
-    model = GeoTr()
-    model = paddle.DataParallel(model)
-
-    # Scheduler
-    scheduler = optim.lr.ReduceOnPlateau(
-        learning_rate=args.lr, mode="min", factor=0.5, patience=3
-    )
-
-    # Optimizer
-    optimizer = optim.Adam(
-        learning_rate=scheduler,
-        parameters=model.parameters(),
-    )
-
     # Train loader
     train_dataset = Doc3dDataset(
         args.data_root,
@@ -154,6 +139,23 @@ def train(args):
 
     val_loader = DataLoader(
         val_dataset, batch_size=args.batch_size, num_workers=args.workers
+    )
+
+    # Model
+    model = GeoTr()
+    model = paddle.DataParallel(model)
+
+    # Scheduler
+    scheduler = optim.lr.OneCycleLR(
+        max_learning_rate=args.lr,
+        total_steps=args.epochs * len(train_loader),
+        phase_pct=0.1,
+    )
+
+    # Optimizer
+    optimizer = optim.AdamW(
+        learning_rate=scheduler,
+        parameters=model.parameters(),
     )
 
     # loss function
@@ -188,7 +190,10 @@ def train(args):
             scheduler.step(loss)
 
             if i % 10 == 0:
-                logger.info(f"[TRAIN MODE] Epoch: {epoch}, Iter: {i}, L1 Loss: {loss}")
+                logger.info(
+                    f"[TRAIN MODE] Epoch: {epoch}, Iter: {i}, L1 Loss: {float(loss)},"
+                    f" LR: {float(scheduler.get_lr())}"
+                )
 
         # Validation
         model.eval()
@@ -202,7 +207,8 @@ def train(args):
                 loss = loss_fn(pred_nhwc, target)
                 if i % 10 == 0:
                     logger.info(
-                        f"[VAL MODE] Epoch: {epoch}, VAL Iter: {i}, L1 Loss: {loss}"
+                        f"[VAL MODE] Epoch: {epoch}, VAL Iter: {i}, "
+                        f"L1 Loss: {float(loss)}"
                     )
 
         # Save
@@ -244,21 +250,21 @@ if __name__ == "__main__":
         "--img-size",
         nargs="?",
         type=int,
-        default=128,
+        default=288,
         help="The size of the input image",
     )
     parser.add_argument(
         "--epochs",
         nargs="?",
         type=int,
-        default=100,
+        default=65,
         help="The number of training epochs",
     )
     parser.add_argument(
-        "--batch-size", nargs="?", type=int, default=1, help="Batch Size"
+        "--batch-size", nargs="?", type=int, default=12, help="Batch Size"
     )
     parser.add_argument(
-        "--lr", nargs="?", type=float, default=1e-05, help="Learning Rate"
+        "--lr", nargs="?", type=float, default=1e-04, help="Learning Rate"
     )
     parser.add_argument(
         "--resume",

@@ -55,12 +55,11 @@ class Doc3dDataset(io.Dataset):
 
         return image, bm
 
-    def tight_crop(self, wc: np.ndarray, img: np.ndarray):
+    def tight_crop(self, wc: np.ndarray):
         mask = ((wc[:, :, 0] != 0) & (wc[:, :, 1] != 0) & (wc[:, :, 2] != 0)).astype(
             np.uint8
         )
         mask_size = mask.shape
-
         [y, x] = mask.nonzero()
         min_x = min(x)
         max_x = max(x)
@@ -68,13 +67,8 @@ class Doc3dDataset(io.Dataset):
         max_y = max(y)
 
         wc = wc[min_y : max_y + 1, min_x : max_x + 1, :]
-        img = cv2.bitwise_and(img, img, mask=mask)
-        img = img[min_y : max_y + 1, min_x : max_x + 1, :]
-
         s = 20
-
         wc = np.pad(wc, ((s, s), (s, s), (0, 0)), "constant")
-        img = np.pad(img, ((s, s), (s, s), (0, 0)), "constant")
 
         cx1 = random.randint(0, s - 5)
         cx2 = random.randint(0, s - 5) + 1
@@ -82,17 +76,24 @@ class Doc3dDataset(io.Dataset):
         cy2 = random.randint(0, s - 5) + 1
 
         wc = wc[cy1:-cy2, cx1:-cx2, :]
-        img = img[cy1:-cy2, cx1:-cx2, :]
 
         top: int = min_y - s + cy1
         bottom: int = mask_size[0] - max_y - s + cy2
         left: int = min_x - s + cx1
         right: int = mask_size[1] - max_x - s + cx2
 
-        return wc, img, top, bottom, left, right
+        top = np.clip(top, 0, mask_size[0])
+        bottom = np.clip(bottom, 1, mask_size[0] - 1)
+        left = np.clip(left, 0, mask_size[1])
+        right = np.clip(right, 1, mask_size[1] - 1)
+
+        return wc, top, bottom, left, right
 
     def transform(self, wc, bm, img):
-        wc, img, top, bottom, left, right = self.tight_crop(wc, img)
+        wc, top, bottom, left, right = self.tight_crop(wc)
+
+        img = img[top:-bottom, left:-right, :]
+        cv2.imwrite("img.png", img)
 
         # resize image
         img = cv2.resize(img, self.image_size)
@@ -109,17 +110,17 @@ class Doc3dDataset(io.Dataset):
         bm0 = cv2.resize(bm[:, :, 0], (self.image_size[0], self.image_size[1]))
         bm1 = cv2.resize(bm[:, :, 1], (self.image_size[0], self.image_size[1]))
 
-        target = np.stack([bm0, bm1], axis=-1)
+        bm = np.stack([bm0, bm1], axis=-1)
 
         img = paddle.to_tensor(img).astype(dtype="float32")
-        target = paddle.to_tensor(target).astype(dtype="float32")
+        bm = paddle.to_tensor(bm).astype(dtype="float32")
 
-        return img, target
+        return img, bm
 
 
 if __name__ == "__main__":
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     dataset = Doc3dDataset(
-        root="~/datasets/doc3d/", split="train", is_transform=True, image_size=512
+        root="~/datasets/doc3d/", split="train", is_transform=True, image_size=288
     )
     img, bm = dataset[0]
