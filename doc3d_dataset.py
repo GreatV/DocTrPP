@@ -116,11 +116,3 @@ class Doc3dDataset(io.Dataset):
         bm = paddle.to_tensor(bm).astype(dtype="float32")
 
         return img, bm
-
-
-if __name__ == "__main__":
-    os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
-    dataset = Doc3dDataset(
-        root="~/datasets/doc3d/", split="train", is_transform=True, image_size=288
-    )
-    img, bm = dataset[0]
