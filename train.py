@@ -11,6 +11,8 @@ import paddle.nn as nn
 import paddle.optimizer as optim
 from loguru import logger
 from paddle.io import DataLoader
+from paddle.nn import functional as F
+from paddle_msssim import ms_ssim, ssim
 
 from doc3d_dataset import Doc3dDataset
 from GeoTr import GeoTr
@@ -143,7 +145,10 @@ def train(args):
 
     # Model
     model = GeoTr()
-    model = paddle.DataParallel(model)
+
+    # Data Parallel Mode
+    if RANK == -1 and paddle.device.cuda.device_count() > 1:
+        model = paddle.DataParallel(model)
 
     # Scheduler
     scheduler = optim.lr.OneCycleLR(
@@ -159,7 +164,8 @@ def train(args):
     )
 
     # loss function
-    loss_fn = nn.L1Loss()
+    l1_loss_fn = nn.L1Loss()
+    mse_loss_fn = nn.MSELoss()
 
     # Resume
     best_fitness, start_epoch = 0.0, 0
@@ -183,7 +189,9 @@ def train(args):
 
             pred = model(img)
             pred_nhwc = pred.transpose([0, 2, 1, 3]).transpose([0, 1, 3, 2])
-            loss = loss_fn(pred_nhwc, target)
+
+            loss = l1_loss_fn(pred_nhwc, target)
+            mse_loss = mse_loss_fn(pred_nhwc, target)
 
             loss.backward()
             optimizer.step()
@@ -191,8 +199,8 @@ def train(args):
 
             if i % 10 == 0:
                 logger.info(
-                    f"[TRAIN MODE] Epoch: {epoch}, Iter: {i}, L1 Loss: {float(loss)},"
-                    f" LR: {float(scheduler.get_lr())}"
+                    f"[TRAIN MODE] Epoch: {epoch}, Iter: {i}, L1 Loss: {float(loss)}, "
+                    f"MSE Loss: {float(mse_loss)}, LR: {float(scheduler.get_lr())}"
                 )
 
         # Validation
@@ -202,13 +210,26 @@ def train(args):
             for i, (img, target) in enumerate(val_loader):
                 img = paddle.to_tensor(img)
                 target = paddle.to_tensor(target)
+
                 pred = model(img)
                 pred_nhwc = pred.transpose([0, 2, 1, 3]).transpose([0, 1, 3, 2])
-                loss = loss_fn(pred_nhwc, target)
+
+                # predict image
+                out = F.grid_sample(img, pred_nhwc)
+                out_gt = F.grid_sample(img, target)
+
+                # calculate ssim
+                ssim_val = ssim(out, out_gt, data_range=1.0)
+                ms_ssim_val = ms_ssim(out, out_gt, data_range=1.0)
+
+                loss = l1_loss_fn(pred_nhwc, target)
+                mse_loss = mse_loss_fn(pred_nhwc, target)
+
                 if i % 10 == 0:
                     logger.info(
                         f"[VAL MODE] Epoch: {epoch}, VAL Iter: {i}, "
-                        f"L1 Loss: {float(loss)}"
+                        f"L1 Loss: {float(loss)} MSE Loss: {float(mse_loss)}, "
+                        f"MS-SSIM: {float(ms_ssim_val)}, SSIM: {float(ssim_val)}"
                     )
 
         # Save
@@ -222,8 +243,8 @@ def train(args):
 
         paddle.save(ckpt, str(last))
 
-        if best_fitness < loss:
-            best_fitness = loss
+        if best_fitness < ms_ssim_val:
+            best_fitness = ms_ssim_val
             paddle.save(ckpt, str(best))
 
 
