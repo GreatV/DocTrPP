@@ -2,3 +2,4 @@ hdf5storage
 loguru
 numpy
 scipy
+opencv-python
