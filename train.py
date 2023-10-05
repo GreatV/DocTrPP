@@ -207,6 +207,8 @@ def train(args):
         model.eval()
 
         with paddle.no_grad():
+            fitness = paddle.zeros([])
+
             for i, (img, target) in enumerate(val_loader):
                 img = paddle.to_tensor(img)
                 target = paddle.to_tensor(target)
@@ -221,6 +223,8 @@ def train(args):
                 # calculate ssim
                 ssim_val = ssim(out, out_gt, data_range=1.0)
                 ms_ssim_val = ms_ssim(out, out_gt, data_range=1.0)
+                # calculate fitness
+                fitness += ms_ssim_val
 
                 loss = l1_loss_fn(pred_nhwc, target)
                 mse_loss = mse_loss_fn(pred_nhwc, target)
@@ -231,6 +235,8 @@ def train(args):
                         f"L1 Loss: {float(loss)} MSE Loss: {float(mse_loss)}, "
                         f"MS-SSIM: {float(ms_ssim_val)}, SSIM: {float(ssim_val)}"
                     )
+
+            fitness /= len(val_loader)
 
         # Save
         ckpt = {
@@ -243,8 +249,8 @@ def train(args):
 
         paddle.save(ckpt, str(last))
 
-        if best_fitness < ms_ssim_val:
-            best_fitness = ms_ssim_val
+        if best_fitness < fitness:
+            best_fitness = fitness
             paddle.save(ckpt, str(best))
 
 
