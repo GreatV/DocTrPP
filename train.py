@@ -182,8 +182,6 @@ def train(args):
         model.train()
 
         for i, (img, target) in enumerate(train_loader):
-            optimizer.clear_grad()
-
             img = paddle.to_tensor(img)
             target = paddle.to_tensor(target)
 
@@ -195,7 +193,8 @@ def train(args):
 
             loss.backward()
             optimizer.step()
-            scheduler.step(loss)
+            scheduler.step()
+            optimizer.clear_grad()
 
             if i % 10 == 0:
                 logger.info(

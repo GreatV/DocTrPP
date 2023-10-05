@@ -93,7 +93,6 @@ class Doc3dDataset(io.Dataset):
         wc, top, bottom, left, right = self.tight_crop(wc)
 
         img = img[top:-bottom, left:-right, :]
-        cv2.imwrite("img.png", img)
 
         # resize image
         img = cv2.resize(img, self.image_size)
