@@ -120,7 +120,7 @@ def train(args):
     train_dataset = Doc3dDataset(
         args.data_root,
         split="train",
-        is_transform=True,
+        is_augment=True,
         image_size=args.img_size,
     )
 
@@ -135,7 +135,7 @@ def train(args):
     val_dataset = Doc3dDataset(
         args.data_root,
         split="val",
-        is_transform=True,
+        is_augment=False,
         image_size=args.img_size,
     )
 
@@ -223,11 +223,12 @@ def train(args):
                 # calculate ssim
                 ssim_val = ssim(out, out_gt, data_range=1.0)
                 ms_ssim_val = ms_ssim(out, out_gt, data_range=1.0)
-                # calculate fitness
-                fitness += ssim_val
 
                 loss = l1_loss_fn(pred_nhwc, target)
                 mse_loss = mse_loss_fn(pred_nhwc, target)
+
+                # calculate fitness
+                fitness += ssim_val
 
                 if i % 10 == 0:
                     logger.info(

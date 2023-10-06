@@ -2,6 +2,7 @@ import collections
 import os
 import random
 
+import albumentations as A
 import cv2
 import hdf5storage as h5
 import numpy as np
@@ -13,16 +14,23 @@ random.seed(12345678)
 
 
 class Doc3dDataset(io.Dataset):
-    def __init__(self, root, split="train", is_transform=False, image_size=512):
+    def __init__(self, root, split="train", is_augment=False, image_size=512):
         self.root = os.path.expanduser(root)
 
         self.split = split
-        self.is_transform = is_transform
+        self.is_augment = is_augment
 
         self.files = collections.defaultdict(list)
 
         self.image_size = (
             image_size if isinstance(image_size, tuple) else (image_size, image_size)
+        )
+
+        # Augmentation
+        self.augmentation = A.Compose(
+            [
+                A.ColorJitter(),
+            ]
         )
 
         for split in ["train", "val"]:
@@ -50,8 +58,7 @@ class Doc3dDataset(io.Dataset):
         bm_path = os.path.join(self.root, "bm", image_name + ".mat")
         bm = h5.loadmat(bm_path)["bm"]
 
-        if self.is_transform:
-            image, bm = self.transform(wc, bm, image)
+        image, bm = self.transform(wc, bm, image)
 
         return image, bm
 
@@ -67,13 +74,13 @@ class Doc3dDataset(io.Dataset):
         max_y = max(y)
 
         wc = wc[min_y : max_y + 1, min_x : max_x + 1, :]
-        s = 20
+        s = 10
         wc = np.pad(wc, ((s, s), (s, s), (0, 0)), "constant")
 
-        cx1 = random.randint(0, s - 5)
-        cx2 = random.randint(0, s - 5) + 1
-        cy1 = random.randint(0, s - 5)
-        cy2 = random.randint(0, s - 5) + 1
+        cx1 = random.randint(0, 2 * s)
+        cx2 = random.randint(0, 2 * s) + 1
+        cy1 = random.randint(0, 2 * s)
+        cy2 = random.randint(0, 2 * s) + 1
 
         wc = wc[cy1:-cy2, cx1:-cx2, :]
 
@@ -94,9 +101,13 @@ class Doc3dDataset(io.Dataset):
 
         img = img[top:-bottom, left:-right, :]
 
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        if self.is_augment:
+            img = self.augmentation(image=img)["image"]
+
         # resize image
         img = cv2.resize(img, self.image_size)
-        img = img[:, :, ::-1]
         img = img.astype(np.float32) / 255.0
         img = img.transpose(2, 0, 1)
 

@@ -3,3 +3,5 @@ loguru
 numpy
 scipy
 opencv-python
+matplotlib
+albumentations
