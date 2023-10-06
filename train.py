@@ -155,6 +155,7 @@ def train(args):
         max_learning_rate=args.lr,
         total_steps=args.epochs * len(train_loader),
         phase_pct=0.1,
+        end_learning_rate=args.lr / 2.5e5,
     )
 
     # Optimizer
@@ -223,7 +224,7 @@ def train(args):
                 ssim_val = ssim(out, out_gt, data_range=1.0)
                 ms_ssim_val = ms_ssim(out, out_gt, data_range=1.0)
                 # calculate fitness
-                fitness += ms_ssim_val
+                fitness += ssim_val
 
                 loss = l1_loss_fn(pred_nhwc, target)
                 mse_loss = mse_loss_fn(pred_nhwc, target)
