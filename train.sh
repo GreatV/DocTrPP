@@ -6,4 +6,5 @@ python train.py --img-size 288 \
     --name "DocTr++" \
     --batch-size 48 \
     --lr 1e-4 \
-    --exist-ok
+    --exist-ok \
+    --use-vdl

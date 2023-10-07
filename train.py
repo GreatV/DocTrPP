@@ -104,6 +104,13 @@ def increment_path(path, exist_ok=False, sep="", mkdir=False):
 def train(args):
     save_dir = Path(args.save_dir)
 
+    use_vdl = args.use_vdl
+    if use_vdl:
+        from visualdl import LogWriter
+
+        log_dir = save_dir / "vdl"
+        vdl_writer = LogWriter(str(log_dir))
+
     # Directories
     weights_dir = save_dir / "weights"
     weights_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -145,6 +152,16 @@ def train(args):
 
     # Model
     model = GeoTr()
+
+    if use_vdl:
+        vdl_writer.add_graph(
+            model,
+            input_spec=[
+                paddle.static.InputSpec(
+                    [-1, 3, args.img_size, args.img_size], "float32"
+                )
+            ],
+        )
 
     # Data Parallel Mode
     if RANK == -1 and paddle.device.cuda.device_count() > 1:
@@ -192,6 +209,19 @@ def train(args):
             loss = l1_loss_fn(pred_nhwc, target)
             mse_loss = mse_loss_fn(pred_nhwc, target)
 
+            if use_vdl:
+                vdl_writer.add_scalar(
+                    "Train/L1 Loss", float(loss), epoch * len(train_loader) + i
+                )
+                vdl_writer.add_scalar(
+                    "Train/MSE Loss", float(mse_loss), epoch * len(train_loader) + i
+                )
+                vdl_writer.add_scalar(
+                    "Train/Learning Rate",
+                    float(scheduler.get_lr()),
+                    epoch * len(train_loader) + i,
+                )
+
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -207,7 +237,10 @@ def train(args):
         model.eval()
 
         with paddle.no_grad():
-            fitness = paddle.zeros([])
+            avg_ssim = paddle.zeros([])
+            avg_ms_ssim = paddle.zeros([])
+            avg_l1_loss = paddle.zeros([])
+            avg_mse_loss = paddle.zeros([])
 
             for i, (img, target) in enumerate(val_loader):
                 img = paddle.to_tensor(img)
@@ -228,7 +261,10 @@ def train(args):
                 mse_loss = mse_loss_fn(pred_nhwc, target)
 
                 # calculate fitness
-                fitness += ssim_val
+                avg_ssim += ssim_val
+                avg_ms_ssim += ms_ssim_val
+                avg_l1_loss += loss
+                avg_mse_loss += mse_loss
 
                 if i % 10 == 0:
                     logger.info(
@@ -237,7 +273,16 @@ def train(args):
                         f"MS-SSIM: {float(ms_ssim_val)}, SSIM: {float(ssim_val)}"
                     )
 
-            fitness /= len(val_loader)
+            avg_ssim /= len(val_loader)
+            avg_ms_ssim /= len(val_loader)
+            avg_l1_loss /= len(val_loader)
+            avg_mse_loss /= len(val_loader)
+
+            if use_vdl:
+                vdl_writer.add_scalar("Val/L1 Loss", float(loss), epoch)
+                vdl_writer.add_scalar("Val/MSE Loss", float(mse_loss), epoch)
+                vdl_writer.add_scalar("Val/SSIM", float(ssim_val), epoch)
+                vdl_writer.add_scalar("Val/MS-SSIM", float(ms_ssim_val), epoch)
 
         # Save
         ckpt = {
@@ -250,9 +295,12 @@ def train(args):
 
         paddle.save(ckpt, str(last))
 
-        if best_fitness < fitness:
-            best_fitness = fitness
+        if best_fitness < avg_ssim:
+            best_fitness = avg_ssim
             paddle.save(ckpt, str(best))
+
+    if use_vdl:
+        vdl_writer.close()
 
 
 def main(args):
@@ -312,5 +360,6 @@ if __name__ == "__main__":
         help="existing project/name ok, do not increment",
     )
     parser.add_argument("--seed", type=int, default=0, help="Global training seed")
+    parser.add_argument("--use-vdl", action="store_true", help="use VisualDL as logger")
     args = parser.parse_args()
     main(args)
