@@ -157,9 +157,7 @@ def train(args):
         vdl_writer.add_graph(
             model,
             input_spec=[
-                paddle.static.InputSpec(
-                    [-1, 3, args.img_size, args.img_size], "float32"
-                )
+                paddle.static.InputSpec([1, 3, args.img_size, args.img_size], "float32")
             ],
         )
 
@@ -272,6 +270,40 @@ def train(args):
                         f"L1 Loss: {float(loss)} MSE Loss: {float(mse_loss)}, "
                         f"MS-SSIM: {float(ms_ssim_val)}, SSIM: {float(ssim_val)}"
                     )
+
+                if use_vdl and i == 0:
+                    img_0 = out[0].numpy().transpose((1, 2, 0))
+                    img_0 = img_0[:, :, ::-1]
+                    img_0 = img_0 * 255.0
+                    img_0 = img_0.astype("uint8")
+                    img_gt_0 = out_gt[0].numpy().transpose((1, 2, 0))
+                    img_gt_0 = img_gt_0[:, :, ::-1]
+                    img_gt_0 = img_gt_0 * 255.0
+                    img_gt_0 = img_gt_0.astype("uint8")
+                    vdl_writer.add_image("Val/Predicted Image No.0", img_0, epoch)
+                    vdl_writer.add_image("Val/Target Image No.0", img_gt_0, epoch)
+
+                    img_1 = out[1].numpy().transpose((1, 2, 0))
+                    img_1 = img_1[:, :, ::-1]
+                    img_1 = img_1 * 255.0
+                    img_1 = img_1.astype("uint8")
+                    img_gt_1 = out_gt[1].numpy().transpose((1, 2, 0))
+                    img_gt_1 = img_gt_1[:, :, ::-1]
+                    img_gt_1 = img_gt_1 * 255.0
+                    img_gt_1 = img_gt_1.astype("uint8")
+                    vdl_writer.add_image("Val/Predicted Image No.1", img_1, epoch)
+                    vdl_writer.add_image("Val/Target Image No.1", img_gt_1, epoch)
+
+                    img_2 = out[2].numpy().transpose((1, 2, 0))
+                    img_2 = img_2[:, :, ::-1]
+                    img_2 = img_2 * 255.0
+                    img_2 = img_2.astype("uint8")
+                    img_gt_2 = out_gt[2].numpy().transpose((1, 2, 0))
+                    img_gt_2 = img_gt_2[:, :, ::-1]
+                    img_gt_2 = img_gt_2 * 255.0
+                    img_gt_2 = img_gt_2.astype("uint8")
+                    vdl_writer.add_image("Val/Predicted Image No.2", img_2, epoch)
+                    vdl_writer.add_image("Val/Target Image No.2", img_gt_2, epoch)
 
             avg_ssim /= len(val_loader)
             avg_ms_ssim /= len(val_loader)
