@@ -16,6 +16,7 @@ from paddle_msssim import ms_ssim, ssim
 
 from doc3d_dataset import Doc3dDataset
 from GeoTr import GeoTr
+from utils import to_image
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
@@ -198,11 +199,11 @@ def train(args):
         model.train()
 
         for i, (img, target) in enumerate(train_loader):
-            img = paddle.to_tensor(img)
-            target = paddle.to_tensor(target)
+            img = paddle.to_tensor(img)  # NCHW
+            target = paddle.to_tensor(target)  # NHWC
 
-            pred = model(img)
-            pred_nhwc = pred.transpose([0, 2, 1, 3]).transpose([0, 1, 3, 2])
+            pred = model(img)  # NCHW
+            pred_nhwc = pred.transpose([0, 2, 3, 1])
 
             loss = l1_loss_fn(pred_nhwc, target)
             mse_loss = mse_loss_fn(pred_nhwc, target)
@@ -245,7 +246,7 @@ def train(args):
                 target = paddle.to_tensor(target)
 
                 pred = model(img)
-                pred_nhwc = pred.transpose([0, 2, 1, 3]).transpose([0, 1, 3, 2])
+                pred_nhwc = pred.transpose([0, 2, 3, 1])
 
                 # predict image
                 out = F.grid_sample(img, pred_nhwc)
@@ -272,36 +273,19 @@ def train(args):
                     )
 
                 if use_vdl and i == 0:
-                    img_0 = out[0].numpy().transpose((1, 2, 0))
-                    img_0 = img_0[:, :, ::-1]
-                    img_0 = img_0 * 255.0
-                    img_0 = img_0.astype("uint8")
-                    img_gt_0 = out_gt[0].numpy().transpose((1, 2, 0))
-                    img_gt_0 = img_gt_0[:, :, ::-1]
-                    img_gt_0 = img_gt_0 * 255.0
-                    img_gt_0 = img_gt_0.astype("uint8")
+                    img_0 = to_image(out[0])
+                    img_gt_0 = to_image(out_gt[0])
                     vdl_writer.add_image("Val/Predicted Image No.0", img_0, epoch)
                     vdl_writer.add_image("Val/Target Image No.0", img_gt_0, epoch)
 
-                    img_1 = out[1].numpy().transpose((1, 2, 0))
-                    img_1 = img_1[:, :, ::-1]
-                    img_1 = img_1 * 255.0
-                    img_1 = img_1.astype("uint8")
-                    img_gt_1 = out_gt[1].numpy().transpose((1, 2, 0))
-                    img_gt_1 = img_gt_1[:, :, ::-1]
-                    img_gt_1 = img_gt_1 * 255.0
+                    img_1 = to_image(out[1])
+                    img_gt_1 = to_image(out_gt[1])
                     img_gt_1 = img_gt_1.astype("uint8")
                     vdl_writer.add_image("Val/Predicted Image No.1", img_1, epoch)
                     vdl_writer.add_image("Val/Target Image No.1", img_gt_1, epoch)
 
-                    img_2 = out[2].numpy().transpose((1, 2, 0))
-                    img_2 = img_2[:, :, ::-1]
-                    img_2 = img_2 * 255.0
-                    img_2 = img_2.astype("uint8")
-                    img_gt_2 = out_gt[2].numpy().transpose((1, 2, 0))
-                    img_gt_2 = img_gt_2[:, :, ::-1]
-                    img_gt_2 = img_gt_2 * 255.0
-                    img_gt_2 = img_gt_2.astype("uint8")
+                    img_2 = to_image(out[2])
+                    img_gt_2 = to_image(out_gt[2])
                     vdl_writer.add_image("Val/Predicted Image No.2", img_2, epoch)
                     vdl_writer.add_image("Val/Target Image No.2", img_gt_2, epoch)
 
