@@ -52,7 +52,6 @@ def unwarp(img, bm, bm_data_format="NCHW"):
     Returns:
         out (paddle.Tensor): The output image.
     """
-    print(bm.shape)
     _, _, h, w = img.shape
 
     if bm_data_format == "NHWC":
