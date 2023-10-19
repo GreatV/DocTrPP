@@ -39,11 +39,11 @@ dirname = os.path.join(root, "img", str(folder))
 choices = [f for f in os.listdir(dirname) if "png" in f]
 fname = random.choice(choices)
 
-##### Read Image #####
+# Read Image
 img_path = os.path.join(dirname, fname)
 img = cv2.imread(img_path)
 
-##### Read 3D Coords #####
+# Read 3D Coords
 wc_path = os.path.join(root, "wc", str(folder), fname[:-3] + "exr")
 wc = cv2.imread(wc_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
 # scale wc
@@ -60,34 +60,34 @@ wc[:, :, 0] = (wc[:, :, 0] - zmn) / (zmx - zmn)
 wc[:, :, 1] = (wc[:, :, 1] - ymn) / (ymx - ymn)
 wc[:, :, 2] = (wc[:, :, 2] - xmn) / (xmx - xmn)
 
-##### Read Backward Map #####
+# Read Backward Map
 bm_path = os.path.join(root, "bm", str(folder), fname[:-3] + "mat")
 bm = h5.loadmat(bm_path)["bm"]
 
-##### Read UV Map #####
+# Read UV Map
 uv_path = os.path.join(root, "uv", str(folder), fname[:-3] + "exr")
 uv = cv2.imread(uv_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
 
-##### Read Depth Map #####
+# Read Depth Map
 dmap_path = os.path.join(root, "dmap", str(folder), fname[:-3] + "exr")
 dmap = cv2.imread(dmap_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)[:, :, 0]
-#### do some clipping and scaling to display it
+# do some clipping and scaling to display it
 dmap[dmap > 30.0] = 30
 dmap = 1 - ((dmap - np.min(dmap)) / (np.max(dmap) - np.min(dmap)))
 
-##### Read Normal Map #####
+# Read Normal Map
 norm_path = os.path.join(root, "norm", str(folder), fname[:-3] + "exr")
 norm = cv2.imread(norm_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
 
-##### Read Albedo #####
+# Read Albedo
 alb_path = os.path.join(root, "alb", str(folder), fname[:-3] + "png")
 alb = cv2.imread(alb_path)
 
-##### Read Checkerboard Image #####
+# Read Checkerboard Image
 recon_path = os.path.join(root, "recon", str(folder), fname[:-8] + "chess480001.png")
 recon = cv2.imread(recon_path)
 
-##### Display image and GTs #####
+# Display image and GTs
 
 # use the backward mapping to dewarp the image
 # scale bm to -1.0 to 1.0
