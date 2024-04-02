@@ -249,8 +249,8 @@ def train(args):
                 pred_nhwc = pred.transpose([0, 2, 3, 1])
 
                 # predict image
-                out = F.grid_sample(img, pred_nhwc)
-                out_gt = F.grid_sample(img, target)
+                out = F.grid_sample(img, (pred_nhwc / args.img_size - 0.5) * 2)
+                out_gt = F.grid_sample(img, (target / args.img_size - 0.5) * 2)
 
                 # calculate ssim
                 ssim_val = ssim(out, out_gt, data_range=1.0)
