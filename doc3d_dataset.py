@@ -116,9 +116,10 @@ class Doc3dDataset(io.Dataset):
         bm[:, :, 1] = bm[:, :, 1] - top
         bm[:, :, 0] = bm[:, :, 0] - left
         bm = bm / np.array([448.0 - left - right, 448.0 - top - bottom])
-        bm = (bm - 0.5) * 2
         bm0 = cv2.resize(bm[:, :, 0], (self.image_size[0], self.image_size[1]))
         bm1 = cv2.resize(bm[:, :, 1], (self.image_size[0], self.image_size[1]))
+        bm0 = bm0 * self.image_size[0]
+        bm1 = bm1 * self.image_size[1]
 
         bm = np.stack([bm0, bm1], axis=-1)
 
