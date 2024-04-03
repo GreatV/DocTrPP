@@ -4,7 +4,7 @@ import cv2
 import paddle
 
 from GeoTr import GeoTr
-from utils import to_image, to_tensor, unwarp
+from utils import to_image, to_tensor
 
 
 def run(args):
@@ -19,15 +19,17 @@ def run(args):
     model.eval()
 
     img_org = cv2.imread(image_path)
-    y = to_tensor(img_org)
     img = cv2.resize(img_org, (288, 288))
     x = to_tensor(img)
-
+    y = to_tensor(img_org)
     bm = model(x)
-    out = unwarp(y, bm)
-
-    out = to_image(out)
-    cv2.imwrite(output_path, out)
+    bm = paddle.nn.functional.interpolate(
+        bm, y.shape[2:], mode="bilinear", align_corners=False
+    )
+    bm_nhwc = bm.transpose([0, 2, 3, 1])
+    out = paddle.nn.functional.grid_sample(y, (bm_nhwc / 288 - 0.5) * 2)
+    out_image = to_image(out)
+    cv2.imwrite(output_path, out_image)
 
 
 if __name__ == "__main__":
