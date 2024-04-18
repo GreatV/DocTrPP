@@ -14,8 +14,6 @@ This is a PaddlePaddle implementation of DocTr++. The original paper is [DocTr++
 For dev environment, you may need install the following extra packages:
 
 - [pre-commit](https://pre-commit.com/)
-- [PaDiff](https://github.com/PaddlePaddle/PaDiff)
-- pytest
 
 ## Training
 
