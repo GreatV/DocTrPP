@@ -8,14 +8,7 @@ This is a PaddlePaddle implementation of DocTr++. The original paper is [DocTr++
 
 ## Requirements
 
-- Python 3.10
-- paddlepaddle-gpu 2.5.1
-
-For dev environment, you may need install the following extra packages:
-
-- [pre-commit](https://pre-commit.com/)
-- [PaDiff](https://github.com/PaddlePaddle/PaDiff)
-- pytest
+You need to install the latest version of PaddlePaddle, which is done through this [link](https://www.paddlepaddle.org.cn/).
 
 ## Training
 
