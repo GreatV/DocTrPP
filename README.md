@@ -60,6 +60,14 @@ python predict.py -i "crop/12_2 copy.png" -m runs/train/DocTr++/weights/best.ckp
 ```
 ![document image rectification](https://raw.githubusercontent.com/greatv/DocTrPP/main/doc/imgs/document_image_rectification.jpg)
 
+## Export to onnx
+
+```
+pip install paddle2onnx
+
+python export.py -m ./best.ckpt --format onnx
+```
+
 ## Model Download
 
 The trained model can be downloaded from [here](https://github.com/GreatV/DocTrPP/releases/download/v0.0.2/best.ckpt).
